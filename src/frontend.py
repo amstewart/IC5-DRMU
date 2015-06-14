@@ -63,21 +63,21 @@ class DRMU_Frame(wx.Frame):
         
         #Create labels for rate and thickness
         panel = wx.Panel(self, wx.ID_ANY)
-        self.rateLbl = wx.StaticText(panel, wx.ID_ANY, "0.0 A/s",
-                                     size=(100,100))
-        self.thickLbl = wx.StaticText(panel, wx.ID_ANY, "0.000 kA",
-                                      size=(100,100))
+        self.rateLbl = wx.StaticText(panel, wx.ID_ANY, "0.0 A/s")
+        self.thickLbl = wx.StaticText(panel, wx.ID_ANY, "0.000 kA")
         #Create plot
         self.figure = Figure()
         self.axes = self.figure.add_subplot(111)
-        self.axes.set_xlim(0,20)
-        self.axes.set_ylim(0,3)
-        self.canvas = FigureCanvasWxAgg(self, -1, self.figure)
+        self.axes.set_xlim(0,20,auto=True)
+        self.axes.set_ylim(0,1,auto=True)
+        #Margins add both left and right, but I only want right in x
+        #self.axes.margins(0.5,1,tight=False)
+        self.canvas = FigureCanvasWxAgg(panel, -1, self.figure)
         #Sizers
         sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(self.rateLbl, 1, wx.ALL|wx.CENTER, 5)
-        sizer.Add(self.thickLbl, 1, wx.ALL|wx.CENTER, 5)
-        sizer.Add(self.canvas, 1, wx.ALL|wx.CENTER, 5)
+        sizer.Add(self.rateLbl, 0, wx.ALL|wx.ALIGN_CENTER, 5)
+        sizer.Add(self.thickLbl, 0, wx.ALL|wx.ALIGN_CENTER, 5)
+        sizer.Add(self.canvas, 1, wx.ALL|wx.ALIGN_CENTER, 5)
         panel.SetSizer(sizer)
         sizer.Fit(self)
         #sizer.Layout()
@@ -105,7 +105,7 @@ class DRMU_Frame(wx.Frame):
         self.thickLbl.SetLabel(str(thick)+" A")
         self.h.set_xdata(self.DataLog['t'])
         self.h.set_ydata(self.DataLog['r'])
-        self.axes.autoscale()
+        self.axes.relim()
         self.axes.autoscale_view()
         self.canvas.draw()
         
