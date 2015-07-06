@@ -14,6 +14,9 @@ import numpy as np
 
 from random import gauss
 from time import sleep, clock
+from datetime import now
+
+me = "IC5-DRMU v2015.1.a"
 
 
 class BackEndThread(Thread):
@@ -75,6 +78,16 @@ class BackEndThread(Thread):
         self.thic2 = self.rate2*self.inc*self.readevery
         self.inc +=1
 
+# class IC5Log():
+    # def __init__(self, layers=[1]):
+        # self.log = {'t':[0.0], 'toff':0.0}
+        # self.layers = layers
+        # for l in layers:
+            # self.log[l] = {'r':[], 'l':[], 'loff':0.0}
+        
+    # def Update(self, )
+        
+        
 class DRMU_Frame(wx.Frame):
     def __init__(self, parent):
         wx.Frame.__init__(self, parent, -1,
@@ -84,13 +97,10 @@ class DRMU_Frame(wx.Frame):
         self.axes.set_xlim(0,20,auto=True)
         self.axes.set_ylim(0,1,auto=True)
         
-        self.StartBtn.Enable()
+        self.StartBtn.Disable()
         self.PauseBtn.Disable()
         self.StopBtn.Disable()
         
-        self.OnStart, self.StopHit = False, False
-        
-        self.DataLog = {'toff':0.0}
         self.RatesToAvg = {}
         self.Sets = {'logtime':1.0, 'readnum':4, 'readtime':0.5,
                      'codep':False, 'logzero':True, 'zerostart':True,
@@ -139,6 +149,8 @@ class DRMU_Frame(wx.Frame):
         logmenu = wx.Menu()
         logSettings = logmenu.Append(-1, "&Settings",
                                      "Change logging settings")
+        logErase = logmenu.Append(-1, "&Erase Log",
+                                  "Completely erase log")
         #Create menu bar
         menuBar = wx.MenuBar()
         menuBar.Append(filemenu,"&File")
@@ -160,25 +172,26 @@ class DRMU_Frame(wx.Frame):
         self.Bind(wx.EVT_MENU, self.StopReading, conClose)
         #Bind Logging events
         self.Bind(wx.EVT_MENU, self.LogSet, logSettings)
+        self.Bind(wx.EVT_MENU, self.InitDataLog, logErase)
         
         #Create labels for rate and thickness
         panel = wx.Panel(self, -1)
         
         self.curLbl = wx.StaticText(panel, -1, "Current Rate (A/s)")
-        self.aggLbl = wx.StaticText(panel, -1, "Aggregate Rate (A/s)")
         self.avgLbl = wx.StaticText(panel, -1, "Average Rate (A/s)")
+        self.aggLbl = wx.StaticText(panel, -1, "Aggregate Rate (A/s)")
         self.thkLbl = wx.StaticText(panel, -1, "Thickness (kA)")
         self.ROLabels = [self.curLbl, self.avgLbl, self.aggLbl, self.thkLbl]
         
         self.curR1L = wx.StaticText(panel, -1, "0.0")
-        self.aggR1L = wx.StaticText(panel, -1, "0.0")
         self.avgR1L = wx.StaticText(panel, -1, "0.0")
+        self.aggR1L = wx.StaticText(panel, -1, "0.0")
         self.thick1L = wx.StaticText(panel, -1, "0.000")
         self.ROLayer1 = [self.curR1L, self.avgR1L, self.aggR1L, self.thick1L]
         
         self.curR2L = wx.StaticText(panel, -1, "0.0")
-        self.aggR2L = wx.StaticText(panel, -1, "0.0")
         self.avgR2L = wx.StaticText(panel, -1, "0.0")
+        self.aggR2L = wx.StaticText(panel, -1, "0.0")
         self.thick2L = wx.StaticText(panel, -1, "0.000")
         self.ROLayer2 = [self.curR2L, self.avgR2L, self.aggR2L, self.thick2L]
         
@@ -304,20 +317,19 @@ class DRMU_Frame(wx.Frame):
     def ConSet(self, event):
         connection = DRMU_Serial(self)
         
+    def InitDataLog(self):
+        self.DataLog = {'t':[], 'toff':0.0}
+        for layer in self.Sets['layers']:
+            self.DatalLog[layer] = {'r':[], 'l':[], 'loff':0.0}
+        self.StartStop = (0, -1)
+        
     # def UpdateReadOut(self, readout, curR, avgR, aggR, thik)
     def UpdateData(self, time, rates, thicks):
         
         # Handle Start of logging
         # Thickness offsets set in loop below
         if self.OnStart:
-            self.LogComments.append(
-                "#{}: Log began.".format(time))
-            if self.Sets['zerostart']:
-                # Still needs to zero the thicknesses
-                self.DataLog['toff'] = -time
-                self.LogComments.append(
-                    "#{}: Time offset by {} s.".format(time,
-                        self.DataLog['toff']))
+            
         
         # Loop to update everything
         # This should loop at most twice
@@ -325,22 +337,9 @@ class DRMU_Frame(wx.Frame):
             # len(Sets['layers']) = 1 or 2
             l = self.Sets['layers'][i]
             # Store layer data to DataLog
-            try:
-                self.DataLog['t'].append(time)
-                self.DataLog[l]['r'].append(rates[i])
-                self.DataLog[l]['l'].append(thicks[i])
-            except KeyError:
-                self.DataLog[l] = {}
-                self.DataLog['t'] = [time]
-                self.DataLog[l]['r'] = [rates[i]]
-                self.DataLog[l]['l'] = [thicks[i]]
-                self.DataLog[l]['loff'] = 0.0
-            # OnStart, set layer thickness offset
-            if self.OnStart and self.Sets['zerostart']:
-                self.DataLog[l]['loff'] = -thicks[i]
-                self.LogComments.append(
-                    "#{}:Layer {} thickness offset by {} A.".format(time,
-                        l, self.DataLog[l]['loff']))
+            self.DataLog['t'].append(time)
+            self.DataLog[l]['r'].append(rates[i])
+            self.DataLog[l]['l'].append(thicks[i])
             # Keep last n(=10) rates for averaging
             try:
                 self.RatesToAvg[i].append(rates[i])
@@ -348,12 +347,12 @@ class DRMU_Frame(wx.Frame):
                     self.RatesToAvg[i] = RatesToAvg[i][1:]
             except KeyError:
                 self.RatesToAvg[i] = [rates[i]]
+            # Update ReadOuts
             # Calculate non-current rates
             avgRate = round(sum(self.RatesToAvg[i])/len(self.RatesToAvg[i]),3)
-            aggRate = round(thicks[i]/time, 3)
-            # Update ReadOuts
             offTime = time + self.DataLog['toff']
             offThick = thicks[i] + self.DataLog[l]['loff']
+            aggRate = round(offThick/offTime, 3)
             # ReadOuts[i] = [curR, avgR, aggR, thick] <- wx.StaticTexts
             self.ReadOuts[i][0].SetLabel(str(rates[i]))
             self.ReadOuts[i][1].SetLabel(str(avgRate))
@@ -367,16 +366,36 @@ class DRMU_Frame(wx.Frame):
         self.axes.autoscale_view()
         self.canvas.draw()
         
-        if self.OnStart: self.OnStart = False
+        if self.FirstUpdate:
+            self.StartBtn.Enable()
+            self.FirstUpdate = False
         
     def Tear(self, event):
-        #Present a modal dialogue asking if they really want to do this
-        #then clear the log:
-        #self.DataLog = {}
+        # Set offsets to zero all thicknesses and time.
         pass
     
     def StartLogging(self,event):
-        self.OnStart = True
+        # For event recording, grab the time and the point in the log
+        time = self.DataLog['t'][-1]
+        t = len(self.DataLog['t'])
+        # Log the start time and write a comment
+        self.LogComments.append((t, time, "#{}: Log began.".format(time)))
+        self.StartStop[0] = t
+        if self.Sets['zerostart']:
+            # Set a time offset
+            self.DataLog['toff'] = -time
+            self.LogComments.append((t, time,
+                                    "#{}: Time offset by {} s.".format(time,
+                                                        self.DataLog['toff']))
+            for l in self.Sets['layers']:
+                # Set layer thickness offset
+                self.DataLog[l]['loff'] = -self.DataLog[l]['l'][-1]
+                self.LogComments.append((t, time,
+                    "#{}:Layer {} thickness offset by {} A.".format(time,
+                        l, self.DataLog[l]['loff'])))
+                self.DataLog[l]['loff']
+        
+        # self.OnStart = True
         self.StartBtn.Disable()
         # self.PauseBtn.Enable()
         self.StopBtn.Enable()
@@ -388,13 +407,29 @@ class DRMU_Frame(wx.Frame):
         pass
         
     def StopLogging(self, event):
-        self.StopHit = True
+        # For event recording, grab the time and the point in the log
+        time = self.DataLog['t'][-1]
+        t = len(self.DataLog['t'])
+        # Log the start time and write a comment
+        self.LogComments.append((t, time, "#{}: Log ended.".format(time)))
+        self.StartStop[1] = t
         self.StartBtn.Enable()
         self.StopBtn.Disable()
         # self.PauseBtn.Enable()
-        #And also save the log
-        # you know, when we get around to that.
 
+    def SaveLog(self, event):
+        # Write a file of DataLog between StartStop points
+        # Grab comments
+        toWrite = "#Log written by {}\n#{}\n".format(me, now())
+        toWrite += "\n".join(c for (t,tt,c) in self.LogComments)+"\n"
+        table = ["time(s)"]
+        for l in self.Sets['layers']:
+            table[0] += "\trate {}(A/s)\tthickness {}(A)".format(l,l)
+        for i in range(len(self.DataLog['t'])):
+            # needs to be written
+            pass
+        toWrite += "\n".join([header,])
+        
     def OnExit(self,e):
         self.Close(True)
 
@@ -594,9 +629,14 @@ class DRMU_Serial(wx.Frame):
                                        # self.parent.Sets['logtime'],
                                        # self.parent.Sets['readtime'],
                                        # self.parent.Sets['readnum'])
+        # Initialize the data log and begin the backend thread
+        self.parent.InitDataLog
         self.parent.Sets['port'] = self.sernumSpn.GetValue()
         self.parent.Sets['baud'] = int(self.baudrtTxt.GetValue())
         self.parent.BET = BackEndThread(self.parent)
+        # Don't enable the start button until after the first data read
+        # self.parent.StartBtn.Enable()
+        self.parent.FirstUpdate = True
         self.Close(True)
         
     def OnExit(self,e):
