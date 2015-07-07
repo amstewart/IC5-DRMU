@@ -1,5 +1,5 @@
 """Front end for Inficon IC/5 interface.
-2.Jul.2015, by David M. Stewart"""
+7.Jul.2015, by David M. Stewart"""
 
 import wx, sys, serial
 from wx.lib.pubsub import pub
@@ -14,9 +14,9 @@ import numpy as np
 
 from random import gauss
 from time import sleep, clock
-from datetime import now
+import datetime
 
-me = "IC5-DRMU v2015.1.a"
+me = "IC5-DRMU v2015.1.b"
 
 
 class BackEndThread(Thread):
@@ -40,8 +40,8 @@ class BackEndThread(Thread):
                 wx.CallAfter(self.query)
                 n += 1
                 sleep(self.readevery)
-            self.rates = [sum(self.readL1)/len(self.readL1),
-                          sum(self.readL2)/len(self.readL2)]
+            self.rates = [round(sum(self.readL1)/len(self.readL1),3),
+                          round(sum(self.readL2)/len(self.readL2),3)]
             self.thicks = [self.thic1,self.thic2]
             self.time = round(clock(),2)
             # Post it
@@ -74,8 +74,8 @@ class BackEndThread(Thread):
         # print "Fake IC5 looping"
         self.rate1 = round(gauss(0.23,0.02),3)
         self.rate2 = round(gauss(0.15,0.02),3)
-        self.thic1 = self.rate1*self.inc*self.readevery
-        self.thic2 = self.rate2*self.inc*self.readevery
+        self.thic1 = round(self.rate1*self.inc*self.readevery,2)
+        self.thic2 = round(self.rate2*self.inc*self.readevery,2)
         self.inc +=1
 
 # class IC5Log():
@@ -161,6 +161,7 @@ class DRMU_Frame(wx.Frame):
         
         #Bind File events
         self.Bind(wx.EVT_MENU, self.OnExit, fileExit)
+        self.Bind(wx.EVT_MENU, self.SaveLog, fileSave)
         # Bind View events
         self.Bind(wx.EVT_MENU, self.TogCoDep, self.viewCoDep)
         self.Bind(wx.EVT_MENU, self.TogCurRate, self.viewCurRate)
@@ -177,25 +178,31 @@ class DRMU_Frame(wx.Frame):
         #Create labels for rate and thickness
         panel = wx.Panel(self, -1)
         
+        LBufLbl = wx.StaticText(panel, -1, "")
         self.curLbl = wx.StaticText(panel, -1, "Current Rate (A/s)")
         self.avgLbl = wx.StaticText(panel, -1, "Average Rate (A/s)")
         self.aggLbl = wx.StaticText(panel, -1, "Aggregate Rate (A/s)")
-        self.thkLbl = wx.StaticText(panel, -1, "Thickness (kA)")
+        self.thkLbl = wx.StaticText(panel, -1, "Thickness (A)")
         self.ROLabels = [self.curLbl, self.avgLbl, self.aggLbl, self.thkLbl]
         
-        self.curR1L = wx.StaticText(panel, -1, "0.0")
-        self.avgR1L = wx.StaticText(panel, -1, "0.0")
-        self.aggR1L = wx.StaticText(panel, -1, "0.0")
-        self.thick1L = wx.StaticText(panel, -1, "0.000")
+        L1HeadLbl = wx.StaticText(panel, -1, "Layer 1")
+        self.curR1L = wx.StaticText(panel, -1, "0.000")
+        self.avgR1L = wx.StaticText(panel, -1, "0.000")
+        self.aggR1L = wx.StaticText(panel, -1, "0.000")
+        self.thick1L = wx.StaticText(panel, -1, "0000.0")
         self.ROLayer1 = [self.curR1L, self.avgR1L, self.aggR1L, self.thick1L]
         
-        self.curR2L = wx.StaticText(panel, -1, "0.0")
-        self.avgR2L = wx.StaticText(panel, -1, "0.0")
-        self.aggR2L = wx.StaticText(panel, -1, "0.0")
-        self.thick2L = wx.StaticText(panel, -1, "0.000")
+        L2HeadLbl = wx.StaticText(panel, -1, "Layer 2")
+        self.curR2L = wx.StaticText(panel, -1, "0.000")
+        self.avgR2L = wx.StaticText(panel, -1, "0.000")
+        self.aggR2L = wx.StaticText(panel, -1, "0.000")
+        self.thick2L = wx.StaticText(panel, -1, "0000.0")
         self.ROLayer2 = [self.curR2L, self.avgR2L, self.aggR2L, self.thick2L]
         
         self.ReadOuts = [self.ROLayer1, self.ROLayer2]
+        
+        self.TimeHdLbl = wx.StaticText(panel, -1, "Dep. Time")
+        self.TimeROLbl = wx.StaticText(panel, -1, "00:00")
 
         #Create plot
         self.figure = Figure()
@@ -227,26 +234,49 @@ class DRMU_Frame(wx.Frame):
         commandSzr.Add(self.StopBtn, 0, center, buf)
         
         #Read out labels
+        ROFont = wx.Font(12, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL,
+                         wx.FONTWEIGHT_NORMAL)
+        LbFont = wx.Font(10, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL,
+                         wx.FONTWEIGHT_NORMAL)
+        HdFont = wx.Font(10, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL,
+                         wx.FONTWEIGHT_NORMAL, underline=True)
         self.ROLblSzr = wx.BoxSizer(wx.VERTICAL)
+        self.ROLblSzr.Add(LBufLbl, 0, right, buf)
+        LBufLbl.SetFont(HdFont)
         for l in self.ROLabels:
             self.ROLblSzr.Add(l, 0, right, buf)
+            l.SetFont(ROFont)
         #Layer one readouts
         self.ROL1Szr = wx.BoxSizer(wx.VERTICAL)
+        self.ROL1Szr.Add(L1HeadLbl, 0, center, buf)
+        L1HeadLbl.SetFont(HdFont)
         for l in self.ROLayer1:
             self.ROL1Szr.Add(l, 0, center, buf)
+            l.SetFont(ROFont)
         #Layer two readouts
         self.ROL2Szr = wx.BoxSizer(wx.VERTICAL)
+        self.ROL2Szr.Add(L2HeadLbl, 0, center, buf)
+        L2HeadLbl.SetFont(HdFont)
         for l in self.ROLayer2:
             self.ROL2Szr.Add(l, 0, center, buf)
+            l.SetFont(ROFont)
+        # Time readout
+        self.TimeSzr = wx.BoxSizer(wx.VERTICAL)
+        self.TimeSzr.Add(self.TimeHdLbl, 0, center, buf)
+        self.TimeHdLbl.SetFont(HdFont)
+        self.TimeSzr.Add(self.TimeROLbl, 0, center, buf)
+        self.TimeROLbl.SetFont(ROFont)
             
         #Readouts
+        SomeFlags = wx.LEFT|wx.RIGHT|wx.EXPAND|wx.ALIGN_CENTER
         self.readOutSizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.readOutSizer.Add(commandSzr, 0)
+        self.readOutSizer.Add(commandSzr, 1, SomeFlags, 10)
         self.readOutSizer.Add(self.ROLblSzr, 0)
         self.readOutSizer.Add(self.ROL1Szr, 0)
         self.RODivider = wx.StaticLine(panel, -1, style=wx.LI_VERTICAL)
         self.readOutSizer.Add(self.RODivider, 0, wx.EXPAND|wx.ALL, 2)
         self.readOutSizer.Add(self.ROL2Szr, 0)        
+        self.readOutSizer.Add(self.TimeSzr, 1, SomeFlags, 10)
         
         #Panel Sizer
         sizer = wx.BoxSizer(wx.VERTICAL)
@@ -318,39 +348,37 @@ class DRMU_Frame(wx.Frame):
         connection = DRMU_Serial(self)
         
     def InitDataLog(self):
+        # print "Initing DataLog"
         self.DataLog = {'t':[], 'toff':0.0}
         for layer in self.Sets['layers']:
-            self.DatalLog[layer] = {'r':[], 'l':[], 'loff':0.0}
-        self.StartStop = (0, -1)
+            self.DataLog[layer] = {'r':[], 'l':[], 'loff':0.0}
+        self.iStart, self.iStop = 0, 0
         
     # def UpdateReadOut(self, readout, curR, avgR, aggR, thik)
     def UpdateData(self, time, rates, thicks):
+        # Update the time vector
+        self.DataLog['t'].append(time)
+        offTime = time + self.DataLog['toff']
+        self.TimeROLbl.SetLabel(str(offTime))
         
-        # Handle Start of logging
-        # Thickness offsets set in loop below
-        if self.OnStart:
-            
-        
-        # Loop to update everything
+        # Loop to update everything for the layers
         # This should loop at most twice
         for i in range(len(self.Sets['layers'])):
             # len(Sets['layers']) = 1 or 2
             l = self.Sets['layers'][i]
             # Store layer data to DataLog
-            self.DataLog['t'].append(time)
             self.DataLog[l]['r'].append(rates[i])
             self.DataLog[l]['l'].append(thicks[i])
             # Keep last n(=10) rates for averaging
             try:
                 self.RatesToAvg[i].append(rates[i])
                 if len(self.RatesToAvg[i]) > 10:
-                    self.RatesToAvg[i] = RatesToAvg[i][1:]
+                    self.RatesToAvg[i] = self.RatesToAvg[i][1:]
             except KeyError:
                 self.RatesToAvg[i] = [rates[i]]
             # Update ReadOuts
             # Calculate non-current rates
             avgRate = round(sum(self.RatesToAvg[i])/len(self.RatesToAvg[i]),3)
-            offTime = time + self.DataLog['toff']
             offThick = thicks[i] + self.DataLog[l]['loff']
             aggRate = round(offThick/offTime, 3)
             # ReadOuts[i] = [curR, avgR, aggR, thick] <- wx.StaticTexts
@@ -380,13 +408,13 @@ class DRMU_Frame(wx.Frame):
         t = len(self.DataLog['t'])
         # Log the start time and write a comment
         self.LogComments.append((t, time, "#{}: Log began.".format(time)))
-        self.StartStop[0] = t
+        self.iStart = t
         if self.Sets['zerostart']:
             # Set a time offset
             self.DataLog['toff'] = -time
             self.LogComments.append((t, time,
                                     "#{}: Time offset by {} s.".format(time,
-                                                        self.DataLog['toff']))
+                                                        self.DataLog['toff'])))
             for l in self.Sets['layers']:
                 # Set layer thickness offset
                 self.DataLog[l]['loff'] = -self.DataLog[l]['l'][-1]
@@ -412,23 +440,44 @@ class DRMU_Frame(wx.Frame):
         t = len(self.DataLog['t'])
         # Log the start time and write a comment
         self.LogComments.append((t, time, "#{}: Log ended.".format(time)))
-        self.StartStop[1] = t
+        self.iStop = t
         self.StartBtn.Enable()
         self.StopBtn.Disable()
         # self.PauseBtn.Enable()
 
     def SaveLog(self, event):
         # Write a file of DataLog between StartStop points
-        # Grab comments
-        toWrite = "#Log written by {}\n#{}\n".format(me, now())
-        toWrite += "\n".join(c for (t,tt,c) in self.LogComments)+"\n"
-        table = ["time(s)"]
-        for l in self.Sets['layers']:
-            table[0] += "\trate {}(A/s)\tthickness {}(A)".format(l,l)
-        for i in range(len(self.DataLog['t'])):
-            # needs to be written
-            pass
-        toWrite += "\n".join([header,])
+        # Ask where to save it
+        s = wx.FD_SAVE|wx.FD_CHANGE_DIR|wx.FD_OVERWRITE_PROMPT
+        dlg = wx.FileDialog(self, "Save deposition log", 
+                            wildcard = "Log files (*.log)|*.log|"+\
+                                       "Text files (*.txt)|*.txt",
+                            style = s)
+        if dlg.ShowModal() == wx.ID_OK:
+            # Grab comments
+            toWrite = "#Log written by {}\n#{}\n".format(me,
+                                                datetime.datetime.now())
+            toWrite += "\n".join(c for (t,tt,c) in self.LogComments)+"\n"
+            # Make data table
+            table = ["time(s)"]
+            for l in self.Sets['layers']:
+                # Make the header
+                table[0] += "\trate {}(A/s)\tthickness {}(A)".format(l,l)
+                # StartStop = (start index, stop index)
+            for i in range(self.iStart, self.iStop+1):
+                # Make the data rows
+                items = [str(self.DataLog['t'][i]+self.DataLog['toff'])]
+                for l in self.Sets['layers']:
+                    items += [str(self.DataLog[l]['r'][i]),
+                              str(self.DataLog[l]['l'][i]+\
+                              self.DataLog[l]['loff'])]
+                table.append("\t".join(items))
+            # Finalize and save
+            toWrite += "\n".join(table)
+            with open(dlg.GetPath(), 'w') as fout:
+                fout.write(toWrite)
+        dlg.Destroy()
+        print "Start: {}, Stop: {}".format(self.iStart, self.iStop)
         
     def OnExit(self,e):
         self.Close(True)
@@ -528,14 +577,14 @@ class DRMU_Settings(wx.Frame):
         self.parent.Sets['readnum'] = int(self.readnumTxt.GetValue())
         self.parent.Sets['readtime']= float(self.readtimeTxt.GetValue())
         self.parent.Sets['codep']= self.codepChk.GetValue()
-        if self.parent.Sets['codep']: self.parent.MonLayers = [1,2]
-        else: self.parent.MonLayers = [1]
+        if self.parent.Sets['codep']: self.parent.Sets['layers'] = [1,2]
+        else: self.parent.Sets['layers'] = [1]
         self.parent.Sets['logzero']= self.logZeroChk.GetValue()
         self.parent.Sets['zerostart']= self.zeroStartChk.GetValue()
         self.parent.Sets['l1corr'] = float(self.corrL1Txt.GetValue())
         self.parent.Sets['l2corr'] = float(self.corrL2Txt.GetValue())
         # top = wx.GetApp().GetTopWindow()
-        # top.Close()
+        # top.Close()       
         self.Close(True)
         
     def LogTimeUpDate(self, event):
@@ -630,7 +679,7 @@ class DRMU_Serial(wx.Frame):
                                        # self.parent.Sets['readtime'],
                                        # self.parent.Sets['readnum'])
         # Initialize the data log and begin the backend thread
-        self.parent.InitDataLog
+        self.parent.InitDataLog()
         self.parent.Sets['port'] = self.sernumSpn.GetValue()
         self.parent.Sets['baud'] = int(self.baudrtTxt.GetValue())
         self.parent.BET = BackEndThread(self.parent)
