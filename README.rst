@@ -1,5 +1,6 @@
+########
 IC5-DRMU
-========
+########
 **Deposition Rate Monitoring and prediction Utility for the INFICON IC/5 Deposition Controller**
 
 COPYRIGHT
@@ -22,4 +23,10 @@ INSTALLATION
 
 PREREQUISITS
 ------------
+1. Python 2
+2. wxPython >= 3.0
+3. matplotlib
 
+RELEASE NOTES
+=============
+**This project is in testing and has no release 1. The first release will be tagged: v2015.1**
