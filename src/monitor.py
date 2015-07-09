@@ -1,5 +1,4 @@
-"""Serial script for interacting with the Inficon IC/5 Deposition Controller
-12.Jun.2015 by David M Stewart"""
+"""Serial script for interacting with the Inficon IC/5 Deposition Controller"""
 
 import serial, sys
 from time import sleep

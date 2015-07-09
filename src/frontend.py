@@ -1,5 +1,4 @@
-"""Front end for Inficon IC/5 interface.
-7.Jul.2015, by David M. Stewart"""
+"""Front end for Inficon IC/5 interface."""
 
 import wx, sys, serial
 from wx.lib.pubsub import pub
@@ -16,8 +15,7 @@ from random import gauss
 from time import sleep, clock
 import datetime
 
-me = "IC5-DRMU v2015.1.b"
-
+me = "IC5-DRMU"
 
 class BackEndThread(Thread):
     def __init__(self, parent):
@@ -91,7 +89,7 @@ class BackEndThread(Thread):
 class DRMU_Frame(wx.Frame):
     def __init__(self, parent):
         wx.Frame.__init__(self, parent, -1,
-                          title="DRMU - v2015.1.a")
+                          title="DRMU")
         self.BuildFrame()
         
         self.axes.set_xlim(0,20,auto=True)
